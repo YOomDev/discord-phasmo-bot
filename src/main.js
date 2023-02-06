@@ -45,6 +45,7 @@ const help = [ [prefix + "help", "Displays all the available commands", false],
                [prefix + "view [option]", "displays the settings for an option", false],
                [prefix + "select <option>", "Displays all the randomizer options", false],
                [prefix + "roll [count]", "Rolls to add a random item, if a [count] is given it will do so for [count] times", false],
+               [prefix + "possible", "Shows the items possible to roll", false],
                [prefix + "reset", "Resets the current list back to the defaults of the selected option", false] ];
 
 // Setup discord bot
@@ -100,6 +101,7 @@ function onCommand(author, args, rawMessage) {
             } else if (!roll(args[1], channel)) { channel.send("Please enter a number as an argument"); }
             break;
         case "reset": selectId(selected, channel); break;
+        case "possible": viewPossible(channel); break;
         case "verify": if (args[1] == "add" && args[2] == "YO") { channel.send("Added a verify request, bot will not remove itself during this session, bot creator should add it to the bot soon"); } else { channel.send("Unknown command '" + args[0] + "', Use '" + prefix + "help' to see all the available commands"); } break
         default: channel.send("Unknown command '" + args[0] + "', Use '" + prefix + "help' to see all the available commands"); break;
     }
@@ -119,18 +121,12 @@ function roll(count, channel) {
 }
 
 function calcPossible() {
-    let tmp = []; let remove = [];
-    for (let i = 0; i < options[selected][3].length; i++) { tmp.push(options[selected][3][i]); }
+    possible = []; let remove = [];
+    for (let i = 0; i < options[selected][3].length; i++) { possible.push(options[selected][3][i]); }
     for (let i = 0; i < list.length; i++) { remove.push(list[i]); }
-    possible = [];
-    for (let i = 0; i < tmp.length; i++) {
-        let found = false;
-        for (let j = 0; j < remove.length; j++) {
-            if (remove[j] === tmp[i]) {
-                found = true; break;
-            }
-        }
-        if (!found) { possible.push(tmp[i]); }
+    for (let i = 0; i < remove.length; i++) {
+        let t = possible.indexOf(remove[i]);
+        if (t > -1) { possible.splice(t, 1); }
     }
 }
 
@@ -141,13 +137,18 @@ function viewCurrent(channel) {
         if (i < list.length - 1) { tmpList += "\n"; }
     }
     if (list.length < 1) { tmpList = "No items"; }
+    let tmpPossible = possible.length + " items";
+    if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][0], color, [["Items", tmpList, true], ["Possible", tmpPossible, true]]); }
+}
+
+function viewPossible(channel) {
     let tmpPossible = "";
     for (let i = 0; i < possible.length; i++) {
         tmpPossible += possible[i];
         if (i < possible.length - 1) { tmpPossible += "\n"; }
     }
     if (possible.length < 1) { tmpPossible = "No items"; }
-    if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][0], color, [["Items", tmpList, false], ["Possible", tmpPossible, false]]); }
+    if (channel != null) { sendEmbed(channel, "Items to roll for", "Preset: " + options[selected][0], color, [["Possible", tmpPossible, false]]); }
 }
 
 function viewOptions(channel) {
@@ -159,8 +160,8 @@ function viewOptions(channel) {
 function viewName(name, channel) {
     for (let i = 0; i < options.length; i++) {
         if (options[i][0] === name) {
-            viewId(i, channel); return true;
-        }
+            viewId(i, channel);
+            return true; }
     }
     return false;
 }
