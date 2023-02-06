@@ -1,0 +1,14 @@
+{
+  "name": "discord-phasmo-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for item randomizer for a single game at a time",
+  "main": "src/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ype Oomes",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.7.1"
+  }
+}
