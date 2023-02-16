@@ -50,6 +50,8 @@ const help = [ [prefix + "help", "Displays all the available commands", false],
 
 // Setup discord bot
 let allowedServers = [1070068557045567588];
+const tempAdd = true;
+const leaveIfUnverified = false;
 // const id = 1070067470934745128;
 const token = "MTA3MDA2NzQ3MDkzNDc0NTEyOA.GwsRq4.-DcB4KJ66BhzpO2iIF2Vv5dfQ76fgjgK1ITVI0";
 const { Client, Events, GatewayIntentBits, EmbedBuilder, ActivityType } = require('discord.js');
@@ -60,13 +62,13 @@ client.login(token);
 
 client.on(Events.MessageCreate, (message) => {
     if (message.inGuild()) {
-        if (message.content == prefix + "verify add YO") { allowedServers.push(message.guild.id); } // TODO tmp fix to not have it removed on joining places i want to be verified, should rename the command later
+        if (message.content == prefix + "verify add YO" && tempAdd) { allowedServers.push(message.guild.id); }
         for (let i = 0; i < allowedServers.length; i++) {
             if (allowedServers[i] == message.guild.id) { onMessage(message.author, message.content, message); return; }
         }
         console.log("Unknown Guild: message received! message: " + message.content);
         console.log("Guild id: " + message.guild.id);
-        message.guild.leave().then( ()=> { console.log("Left guild!"); }, () => { console.log("Failed to leave guild!"); } );
+        if (leaveIfUnverified) { message.guild.leave().then( ()=> { console.log("Left guild!"); }, () => { console.log("Failed to leave guild!"); } ); }
     }
     client.message.send(message.author, "This bot only works in authorized servers!");
 });
@@ -137,8 +139,7 @@ function viewCurrent(channel) {
         if (i < list.length - 1) { tmpList += "\n"; }
     }
     if (list.length < 1) { tmpList = "No items"; }
-    let tmpPossible = possible.length + " items";
-    if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][0], color, [["Items", tmpList, true], ["Possible", tmpPossible, true]]); }
+    if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][0], color, [["Items", tmpList, true], ["Possible", possible.length + " items", true]]); }
 }
 
 function viewPossible(channel) {
