@@ -24,18 +24,19 @@ const TRIPOD = "Tripod";
 
 const FULL = [ EMF, EMF, FLASHLIGHT, FLASHLIGHT, FLASHLIGHT, FLASHLIGHT, STRONG_FLASHLIGHT, STRONG_FLASHLIGHT, STRONG_FLASHLIGHT, STRONG_FLASHLIGHT, SPIRIT_BOX, SPIRIT_BOX, WRITING, WRITING, UV_GLOWSTICK, UV_GLOWSTICK, UV_FLASHLIGHT, UV_FLASHLIGHT, VIDEO_CAMERA, VIDEO_CAMERA, VIDEO_CAMERA, VIDEO_CAMERA, VIDEO_CAMERA, VIDEO_CAMERA, PHOTO_CAMERA, PHOTO_CAMERA, PHOTO_CAMERA, DOTS, DOTS, CANDLE, CANDLE, CANDLE, CANDLE, CRUCIFIX, CRUCIFIX, HEAD_CAMERA, HEAD_CAMERA, HEAD_CAMERA, HEAD_CAMERA, LIGHTER, LIGHTER, LIGHTER, LIGHTER, MOTION_SENSOR, MOTION_SENSOR, MOTION_SENSOR, MOTION_SENSOR, PARABOLIC_MICROPHONE, PARABOLIC_MICROPHONE, SALT, SALT, SALT, SANITY_PILL, SANITY_PILL, SANITY_PILL, SANITY_PILL, SMUDGE_STICK, SMUDGE_STICK, SMUDGE_STICK, SMUDGE_STICK, SOUND_SENSOR, SOUND_SENSOR, SOUND_SENSOR, SOUND_SENSOR, TRIPOD, TRIPOD, TRIPOD, TRIPOD, TRIPOD, THERMOMETER, THERMOMETER, THERMOMETER ];
 const ALL = [ EMF, FLASHLIGHT, STRONG_FLASHLIGHT, SPIRIT_BOX, WRITING, UV_GLOWSTICK, UV_FLASHLIGHT, VIDEO_CAMERA, PHOTO_CAMERA, DOTS, CANDLE, CRUCIFIX, HEAD_CAMERA, LIGHTER, MOTION_SENSOR, PARABOLIC_MICROPHONE, SALT, SANITY_PILL, SMUDGE_STICK, SOUND_SENSOR, TRIPOD, THERMOMETER ];
-const NO_FLASH_LIGHTS = [ EMF, SPIRIT_BOX, WRITING, UV_GLOWSTICK, VIDEO_CAMERA, PHOTO_CAMERA, DOTS, CANDLE, CRUCIFIX, HEAD_CAMERA, LIGHTER, MOTION_SENSOR, PARABOLIC_MICROPHONE, SALT, SANITY_PILL, SMUDGE_STICK, SOUND_SENSOR, TRIPOD, THERMOMETER ];
+const STARTER = [EMF, FLASHLIGHT, UV_FLASHLIGHT, DOTS, WRITING, SPIRIT_BOX, VIDEO_CAMERA, THERMOMETER];
 
 const options = [
-    ["dark", 1, [EMF], NO_FLASH_LIGHTS],
-    ["one-per-evidence", 1, [], ALL],
-    ["OPE-but-harder", 1, [], FULL],
-    ["cameras", 0, [VIDEO_CAMERA, PHOTO_CAMERA, HEAD_CAMERA], []],
-    ["no-evidence", 0, [PHOTO_CAMERA, SALT, FLASHLIGHT, STRONG_FLASHLIGHT, CANDLE, CRUCIFIX, LIGHTER, MOTION_SENSOR, SOUND_SENSOR, PARABOLIC_MICROPHONE, SANITY_PILL, SMUDGE_STICK, TRIPOD], []]
+    ["one-per-evidence", 4, [], ALL],
+    ["all", 0, ALL, FULL],
+    ["normal", 0, STARTER, FULL],
+    ["test", 0, STARTER, ALL],
 ];
+
 let list = [];
 let possible = [];
 let selected = 0;
+let lastRolls = 0;
 
 // Command info
 const prefix = "!";
@@ -49,10 +50,12 @@ const help = [ [prefix + "help", "Displays all the available commands", false],
                [prefix + "reset", "Resets the current list back to the defaults of the selected option", false] ];
 
 // Setup discord bot
-let allowedServers = [1070068557045567588];
-const tempAdd = true;
+let allowedServers = [1070068557045567588, 943224828897394719];
+let allowedChannels = [1077663699801739385, 1071683421354602617];
+let allowedRoles = ["Admin", "Dev", "Ghost hunter"];
+const needsRoles = true;
+const tempAdd = false;
 const leaveIfUnverified = false;
-// const id = 1070067470934745128;
 const token = "MTA3MDA2NzQ3MDkzNDc0NTEyOA.GwsRq4.-DcB4KJ66BhzpO2iIF2Vv5dfQ76fgjgK1ITVI0";
 const { Client, Events, GatewayIntentBits, EmbedBuilder, ActivityType } = require('discord.js');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
@@ -66,47 +69,55 @@ client.on(Events.MessageCreate, (message) => {
         for (let i = 0; i < allowedServers.length; i++) {
             if (allowedServers[i] == message.guild.id) { onMessage(message.author, message.content, message); return; }
         }
-        console.log("Unknown Guild: message received! message: " + message.content);
-        console.log("Guild id: " + message.guild.id);
+        console.log("Unknown Guild: message received! message: " + message.content + "\nGuild id: " + message.guild.id);
         if (leaveIfUnverified) { message.guild.leave().then( ()=> { console.log("Left guild!"); }, () => { console.log("Failed to leave guild!"); } ); }
     }
-    client.message.send(message.author, "This bot only works in authorized servers!");
+    message.channel.send(message.author, "This bot only works in authorized servers!");
 });
 
 function onMessage(author, message, rawMessage) {
     if (author.id !== client.user.id) {
-        console.log("Authorized Guild: message received! message:");
-        console.log(message);
-        // Commands
-        if (message.startsWith(prefix)) {
-            console.log("command triggered");
-            onCommand(author, message.substring(prefix.length, message.length).split(" "), rawMessage);
-        }
+        console.log("Authorized Guild: message received! message: " + message);
+        if (message.startsWith(prefix)) { onCommand(author, message.substring(prefix.length, message.length).split(" "), rawMessage); }
     }
 }
 
-function onCommand(author, args, rawMessage) {
+async function onCommand(author, args, rawMessage) {
     const channel = rawMessage.channel;
-    channel.sendTyping();
-    switch (args[0]) {
-        case "help": sendEmbed(channel, "-=> Help <=-","<> are required, [] are optional", color, help); break;
-        case "options": viewOptions(channel); break;
-        case "view":
-            if (args.length < 2) { viewId(selected, channel); } else { if (!viewName(args[1], channel)) { channel.send("No option with that name found, see '" + prefix + "options' for all the options"); } }
-            break;
-        case "select":
-            if (args.length < 2) { channel.send("Not enough arguments given! (" + args.length + "/2)");
-            } else if (!selectByName(args[1], channel)) { channel.send("No option with that name found, see '" + prefix + "options' for all the options"); }
-            break;
-        case "roll":
-            if (args.length < 2) { roll(1, channel);
-            } else if (!roll(args[1], channel)) { channel.send("Please enter a number as an argument"); }
-            break;
-        case "reset": selectId(selected, channel); break;
-        case "possible": viewPossible(channel); break;
-        case "verify": if (args[1] == "add" && args[2] == "YO") { channel.send("Added a verify request, bot will not remove itself during this session, bot creator should add it to the bot soon"); } else { channel.send("Unknown command '" + args[0] + "', Use '" + prefix + "help' to see all the available commands"); } break
-        default: channel.send("Unknown command '" + args[0] + "', Use '" + prefix + "help' to see all the available commands"); break;
+    console.log("command triggered! Channel id: " + channel.id);
+    if (!contains(allowedChannels, channel.id)) { return; }
+
+    // check if user has the right permissions
+    const member = rawMessage.guild.members.cache.get(author.id);
+    if (!member.roles.cache.some((role) => { return contains(allowedRoles, role.name); })) {
+        if (needsRoles) {
+            channel.send("You do not have the required permissions to use commands on this bot!");
+            return;
+        }
     }
+
+    // Execute command
+    channel.sendTyping().then(() => {
+        switch (args[0]) {
+            case "help": sendEmbed(channel, "-=> Help <=-","<> are required, [] are optional", color, help); break;
+            case "options": viewOptions(channel); break;
+            case "view":
+                if (args.length < 2) { viewId(selected, channel); } else { if (!viewName(args[1], channel)) { channel.send("No option with that name found, see '" + prefix + "options' for all the options"); } }
+                break;
+            case "select":
+                if (args.length < 2) { channel.send("Not enough arguments given! (" + args.length + "/2)");
+                } else if (!selectByName(args[1], channel)) { channel.send("No option with that name found, see '" + prefix + "options' for all the options"); }
+                break;
+            case "roll":
+                if (args.length < 2) { roll(1, channel);
+                } else if (!roll(args[1], channel)) { channel.send("Please enter a number as an argument"); }
+                break;
+            case "reset": selectId(selected, channel); lastRolls = 0; break;
+            case "possible": viewPossible(channel); break;
+            case "verify": if (args[1] == "add" && args[2] == "YO") { channel.send("Added a verify request, bot will not remove itself during this session, bot creator should add it to the bot soon"); } else { channel.send("Unknown command '" + args[0] + "', Use '" + prefix + "help' to see all the available commands"); } break
+            default: channel.send("Unknown command '" + args[0] + "', Use '" + prefix + "help' to see all the available commands"); break;
+        }
+    });
 }
 
 function roll(count, channel) {
@@ -115,6 +126,7 @@ function roll(count, channel) {
     calcPossible();
     if (possible.length < 1) { viewCurrent(channel); return true; }
     if (count < 1) { count = 1; } else if (count > possible.length) { count = possible.length; }
+    lastRolls = count;
     for (let i = 0; i < count; i++) {
         list.push(possible[Math.floor(Math.random() * possible.length)]);
         calcPossible();
@@ -135,7 +147,7 @@ function calcPossible() {
 function viewCurrent(channel) {
     let tmpList = "";
     for (let i = 0; i < list.length; i++) {
-        tmpList += list[i]
+        tmpList += (i >= list.length - lastRolls ? "> " : "") + list[i];
         if (i < list.length - 1) { tmpList += "\n"; }
     }
     if (list.length < 1) { tmpList = "No items"; }
@@ -200,7 +212,8 @@ function selectId(i, channel) {
 function selectByName(name, channel) {
     for (let i = 0; i < options.length; i++) {
         if (options[i][0] === name) {
-            selectId(i, channel); return true;
+            selectId(i, channel);
+            return true;
         }
     }
     return false;
@@ -209,5 +222,12 @@ function selectByName(name, channel) {
 function sendEmbed(channel, title, description, col, fields) {
     let embed = new EmbedBuilder().setTitle(title).setColor(col).setDescription(description);
     for (let i = 0; i < fields.length; i++) { embed.addFields({ name: fields[i][0], value: fields[i][1], inline: fields[i][2] }); }
-    channel.send({embeds: [embed]});
+    channel.send({ embeds: [embed] });
+}
+
+// function sleep(ms) { return new Promise((resolve) => { setTimeout(resolve, ms); }); }
+
+function contains(array, value) {
+    for (let i = 0; i < array.length; i++) { if (array[i] == value) { return true; } }
+    return false;
 }
