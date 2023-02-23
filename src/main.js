@@ -26,7 +26,7 @@ const TRIPOD = "Tripod";
 const ALL = [ EMF, FLASHLIGHT, STRONG_FLASHLIGHT, SPIRIT_BOX, WRITING, UV_GLOWSTICK, UV_FLASHLIGHT, VIDEO_CAMERA, PHOTO_CAMERA, DOTS, CANDLE, CRUCIFIX, HEAD_CAMERA, LIGHTER, MOTION_SENSOR, PARABOLIC_MICROPHONE, SALT, SANITY_PILL, SMUDGE_STICK, SOUND_SENSOR, TRIPOD, THERMOMETER ];
 const STARTER = [EMF, FLASHLIGHT, UV_FLASHLIGHT, DOTS, WRITING, SPIRIT_BOX, VIDEO_CAMERA, THERMOMETER];
 
-const options = [
+let options = [
     ["evidence-rolls", 4, [], ALL],
     ["normal", 0, STARTER, ALL],
     ["test", 0, [FLASHLIGHT, EMF], ALL],
@@ -38,6 +38,9 @@ let list = [];
 let possible = [];
 let selected = 0;
 let lastRolls = 0;
+const RANDOM_CHANCE = 5;
+const accidentMessages = ["Oops, i might have scrambled some lists... ;P", "Did you check your current item list? ;P", "I think i shuffled some of the values, not sure how that happened -_-", "Are you proud of me mom? xD"];
+const BASE_OPTIONS_LENGTH = options.length;
 const randomizedMessages = ["Is this truly random?", "This might be random, or is there a trick to it?", "Could it be?"];
 const hex = "0123456789abcdef";
 
@@ -50,6 +53,7 @@ const help = [ [prefix + "help", "Displays all the available commands", false],
                [prefix + "select <option>", "Displays all the randomizer options", false],
                [prefix + "roll [count]", "Rolls to add a random item, if a [count] is given it will do so for [count] times", false],
                [prefix + "possible", "Shows the items possible to roll", false],
+               [prefix + "random", "May or may not do something...", false],
                [prefix + "reset", "Resets the current list back to the defaults of the selected option", false] ];
 
 // Setup discord bot
@@ -110,7 +114,7 @@ function onCommand(author, args, rawMessage) {
                 break;
             case "reset": selectId(selected, channel); lastRolls = 0; break;
             case "possible": viewPossible(channel); break;
-            case "random": randomMessage(channel); break;
+            case "random": randomAction(channel); break;
             case "verify":
                 if (args[1] === "add" && args[2] === "YO") { sendMessage(channel, "Verify request has been sent", "Bot will not remove itself during this session, bot creator should add it to the bot soon");
                 } else { sendMessage(channel, "Unknown command '" + args[0] + "'", "Use '" + prefix + "help' to see all the available commands"); } break;
@@ -119,10 +123,9 @@ function onCommand(author, args, rawMessage) {
     });
 }
 
-function random(min, max) {
-    let dif = max - min;
-    return Math.floor(min + (Math.random() * (dif + 1)));
-}
+function random(min, max) { return Math.floor(min + (Math.random() * (max - min + 1))); }
+
+function chance(percentage) { return random(0, 100) < percentage; }
 
 function roll(count, channel) {
     if (isNaN(count)) { return false; }
@@ -139,17 +142,18 @@ function roll(count, channel) {
 }
 
 function calcPossible() {
-    possible = []; let remove = [];
+    possible = [];
+    let remove = [];
     for (let i = 0; i < options[selected][3].length; i++) { possible.push(options[selected][3][i]); }
     for (let i = 0; i < list.length; i++) { remove.push(list[i]); }
     for (let i = 0; i < remove.length; i++) {
-        let t = possible.indexOf(remove[i]);
+        const t = possible.indexOf(remove[i]);
         if (t > -1) { possible.splice(t, 1); }
     }
 }
 
 function viewCurrent(channel) {
-    let minSpecial = list.length - 1 - lastRolls;
+    const minSpecial = list.length - 1 - lastRolls;
     let lists = ["", "", ""];
     for (let i = 0; i < list.length; i++) { lists[i % VIEW_COLUMNS] += (i > minSpecial ? "> ***" : "") + list[i] + (i > minSpecial ? "***" : "") + "\n"; }
     let fields = [];
@@ -235,8 +239,37 @@ function sendEmbed(channel, title, description, col, fields) {
 
 function contains(array, value) { for (let i = 0; i < array.length; i++) { if (array[i] == value) { return true; } } return false; }
 
-function randomMessage(channel) {
+function randomAction(channel) {
+    if (chance(RANDOM_CHANCE)) {
+        // Set up possible items
+        let pos = [];
+        for (let i = 0; i < ALL.length; i++) { pos.push(ALL[i]); }
+
+        // Add a random amount of base items
+        const r = random(2, ALL.length / 2);
+        let it = [];
+        while (it.length < r) {
+            let a = random(0, pos.length - 1);
+            if (!contains(it, pos[a])) { it.push(pos[a]); }
+        }
+
+        // Set random items on select
+        const d = random(0, 3);
+
+        // Add the randomized preset to the options
+        const name = "Random-" + (options.length - BASE_OPTIONS_LENGTH + 1);
+        options.push([name, d, it, pos]);
+
+        // LET THE RANDOM COMMENCE
+        if (!selectByName(name, channel)) { sendMessage(channel, "Randomizer error", "Something went wrong trying to make a random funny thing, this shouldnt happen again once it gets fixed!"); return; }
+        randomMessage(channel, accidentMessages);
+        return;
+    }
+    randomMessage(channel, randomizedMessages);
+}
+
+function randomMessage(channel, list) {
     let c = "#";
     for (let i = 0; i < 6; i++) { c += hex[random(0, hex.length -1)]; }
-    sendEmbed(channel, "Random?", randomizedMessages[random(0, randomizedMessages.length - 1)], c, []);
+    sendEmbed(channel, "Random?", list[random(0, list.length - 1)], c, []);
 }
