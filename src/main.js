@@ -26,19 +26,22 @@ const TRIPOD = "Tripod";
 const ALL = [ EMF, FLASHLIGHT, STRONG_FLASHLIGHT, SPIRIT_BOX, WRITING, UV_GLOWSTICK, UV_FLASHLIGHT, VIDEO_CAMERA, PHOTO_CAMERA, DOTS, CANDLE, CRUCIFIX, HEAD_CAMERA, LIGHTER, MOTION_SENSOR, PARABOLIC_MICROPHONE, SALT, SANITY_PILL, SMUDGE_STICK, SOUND_SENSOR, TRIPOD, THERMOMETER ];
 const STARTER = [EMF, FLASHLIGHT, UV_FLASHLIGHT, DOTS, WRITING, SPIRIT_BOX, VIDEO_CAMERA, THERMOMETER];
 
+// format = [name, starting rolls, starting items, possible items, remove instead of add]
 let options = [
-    ["evidence-rolls", 4, [], ALL],
-    ["normal", 0, STARTER, ALL],
-    ["test", 0, [FLASHLIGHT, EMF], ALL],
-    ["empty", 0, [], []],
+    ["evidence-rolls", 4, [], ALL, false],
+    ["normal", 0, STARTER, ALL, false],
+    ["test", 8, [], ALL, true],
+    ["empty", 0, [], [], false],
+    ["remover", 0, ALL, [], true],
 ];
 
 const VIEW_COLUMNS = 1;
 let list = [];
 let possible = [];
+let removed = [];
 let selected = 0;
 let lastRolls = 0;
-const RANDOM_CHANCE = 5;
+const RANDOM_CHANCE = 10;
 const accidentMessages = ["Oops, i might have scrambled some lists... ;P", "Did you check your current item list? ;P", "I think i shuffled some of the values, not sure how that happened -_-", "Are you proud of me mom? xD"];
 const BASE_OPTIONS_LENGTH = options.length;
 const randomizedMessages = ["Is this truly random?", "This might be random, or is there a trick to it?", "Could it be?"];
@@ -109,8 +112,8 @@ function onCommand(author, args, rawMessage) {
                 } else if (!selectByName(args[1], channel)) { sendMessage(channel, "Invalid argument", "No option with that name found, see '" + prefix + "options' for all the options"); }
                 break;
             case "roll":
-                if (args.length < 2) { roll(1, channel);
-                } else if (!roll(args[1], channel)) { sendMessage(channel, "Invalid argument", "Please enter a number as an argument"); }
+                if (args.length < 2) { roll(1, channel, false);
+                } else if (!roll(args[1], channel, false)) { sendMessage(channel, "Invalid argument", "Please enter a number as an argument"); }
                 break;
             case "reset": selectId(selected, channel); lastRolls = 0; break;
             case "possible": viewPossible(channel); break;
@@ -123,22 +126,44 @@ function onCommand(author, args, rawMessage) {
     });
 }
 
+function find(name) { for (let i = 0; i < options.length; i++) { if (options[i][0] === name) { return i; } } return -1; }
+
 function random(min, max) { return Math.floor(min + (Math.random() * (max - min + 1))); }
 
-function chance(percentage) { return random(0, 100) < percentage; }
+function chance(percentage) { return random(0, 99) < percentage; }
 
-function roll(count, channel) {
-    if (isNaN(count)) { return false; }
-    count = Math.floor(count);
-    calcPossible();
-    if (possible.length < 1) { viewCurrent(channel); return true; }
-    if (count < 1) { count = 1; } else if (count > possible.length) { count = possible.length; }
-    lastRolls = count;
-    for (let i = 0; i < count; i++) {
-        list.push(possible[random(0, possible.length - 1)]);
+function roll(count, channel, start) {
+    if (options[selected][4] * !start) {
+        // remove
+        possible = [];
+        removed = [];
+        lastRolls = 0;
+        const l = Math.max(list.length - count, 0);
+        while (list.length > l) {
+            let r = random(0, list.length - 1);
+            removed.push(list[r]);
+            let tmp = [];
+            for (let i = 0; i < list.length; i++) { if (i != r) { tmp.push(list[i]); } }
+            list = [];
+            for (let i = 0; i < tmp.length; i++) { if (!contains(list, tmp[i])) { list.push(tmp[i]); } }
+        }
+        console.log("removing");
+        viewCurrent(channel);
+    } else {
+        // add
+        if (isNaN(count)) { return false; }
+        count = Math.floor(count);
         calcPossible();
+        if (possible.length < 1) { viewCurrent(channel); return true; }
+        if (count < 1) { count = 1; } else if (count > possible.length) { count = possible.length; }
+        lastRolls = count;
+        for (let i = 0; i < count; i++) {
+            list.push(possible[random(0, possible.length - 1)]);
+            calcPossible();
+        }
+        viewCurrent(channel);
     }
-    viewCurrent(channel); return true;
+    return true;
 }
 
 function calcPossible() {
@@ -157,9 +182,14 @@ function viewCurrent(channel) {
     let lists = ["", "", ""];
     for (let i = 0; i < list.length; i++) { lists[i % VIEW_COLUMNS] += (i > minSpecial ? "> ***" : "") + list[i] + (i > minSpecial ? "***" : "") + "\n"; }
     let fields = [];
-    for (let i = 0; i < Math.min(list.length, VIEW_COLUMNS); i++) { fields.push([(i == 0 ? "Items" : " "), lists[i], true]); }
+    for (let i = 0; i < Math.min(list.length, VIEW_COLUMNS); i++) { fields.push([(i == 0 ? "Items" : "."), lists[i], true]); }
     if (list.length < 1) { fields.push(["Items", "No items", false]); }
     fields.push(["Possible", possible.length + " items", false]);
+    let removes = ["", "", ""];
+    if (removed.length > 0) {
+        for (let i = 0; i < removed.length; i++) { removes[i % VIEW_COLUMNS] += removed[i] + "\n"; }
+        for (let i = 0; i < Math.min(removed.length, VIEW_COLUMNS); i++) { fields.push([(i == 0 ? "Removed" : "."), removes[i], true]); }
+    }
     if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][0], color, fields); }
 }
 
@@ -169,40 +199,32 @@ function viewPossible(channel) {
         tmpPossible[i % VIEW_COLUMNS] += possible[i];
         if (i < possible.length - 1) { tmpPossible[i % VIEW_COLUMNS] += "\n"; }
     }
-    if (possible.length < 1) { tmpPossible = "No items"; }
-    let fields = [["Possible", (possible.length > 0 ? "Possible items are shown below" : "No possible items"), false]];
-    for (let i = 0; i < Math.min(possible.length, VIEW_COLUMNS); i++) { fields.push([" ", tmpPossible[i], true]); }
+    let fields = [];
+    for (let i = 0; i < Math.min(possible.length, VIEW_COLUMNS); i++) { fields.push([(i == 0 ? "Possible" : "."), tmpPossible[i], true]); }
+    if (possible.length < 1) { fields.push(["Possible", "No possible items", false]); }
     if (channel != null) { sendEmbed(channel, "Items to roll for", "Preset: " + options[selected][0], color, fields); }
 }
 
 function viewOptions(channel) {
     let fields = [];
-    for (let i = 0 ; i < options.length; i++) { fields.push([options[i][0], options[i][1] + " random items and " + options[i][2].length + " set items", true]); }
+    for (let i = 0 ; i < options.length; i++) { fields.push([options[i][0], options[i][1] + " random items, " + options[i][2].length + " set items and "+  options[i][3].length + " items to roll for." + (options[i][4] ? "\nWill remove items on roll after starting" : ""), true]); }
     sendEmbed(channel, "Options", "A list of all the available setups", color, fields);
 }
 
-function viewName(name, channel) {
-    for (let i = 0; i < options.length; i++) {
-        if (options[i][0] === name) {
-            viewId(i, channel);
-            return true; }
-    }
-    return false;
-}
+function viewName(name, channel) { const i = find(name); if (i > -1) { viewId(i, channel); return true; } return false; }
 
 function viewId(i, channel) {
     if (i < 0 || i >= options.length) { if (i < 0 || i >= options.length) { sendMessage(channel, "ERROR", "Option id out of range, nothing has been selected!"); return; } }
-    const random = options[i][1] > 1 ? "This setup has " + options[i][1] + " more items on top of the starter items, rolled from the list of possibilities" : (options[i][1] === 1 ? "This setup has 1 more item on top of the starter items, rolled from the list of possibilities" : "This setup has no random items added");
     let items = ["", "", ""];
     for (let j = 0; j < options[i][2].length; j++) { items[j % VIEW_COLUMNS] += options[i][2][j] + "\n"; }
-    let fields = [["Info", random, false], ["Starter items:", options[i][2].length > 0 ? "Items are show below" : "No standard starter items", false]];
-    if (options[i][2].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][2].length); j++) { fields.push([" ", items[j], true]); } }
+    let fields = [["Info", options[i][1] > 1 ? "This setup has " + options[i][1] + " more items on top of the starter items, rolled from the list of possibilities" : (options[i][1] === 1 ? "This setup has 1 more item on top of the starter items, rolled from the list of possibilities" : "This setup has no random items added"), false]];
+    if (options[i][2].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][2].length); j++) { fields.push([(j == 0 ? "Starter items:" : "."), items[j], true]); } }
+    if (options[i][2].length < 1) { fields.push(["Starter items:", "No standard starter items", false]); }
     let posItems = ["", "", ""];
     for (let j = 0; j < options[i][3].length; j++) { posItems[j % VIEW_COLUMNS] += options[i][3][j] + "\n"; }
-    fields.push(["Possible roll-able items:", options[i][3].length > 0 ? "Items are show below" : "No possible items", false]);
-    if (options[i][3].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][3].length); j++) { fields.push([" ", posItems[j], true]); } }
-    const name = options[i][0];
-    if (channel != null) { sendEmbed(channel, name, (i === selected ? "Selected" : "Showing") +" option: " + name, color, fields); }
+    if (options[i][3].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][3].length); j++) { fields.push([(j == 0 ? "Possible roll-able items:" : "."), posItems[j], true]); } }
+    if (options[i][3].length < 1) { fields.push(["Possible roll-able items:", "No possible items", false]); }
+    if (channel != null) { sendEmbed(channel, name, (i === selected ? "Selected" : "Showing") +" option: " + options[i][0], color, fields); }
 }
 
 function selectId(i, channel) {
@@ -212,20 +234,13 @@ function selectId(i, channel) {
     // Reset the lists
     selected = i;
     list = [];
+    removed = [];
     for (let i = 0; i < options[selected][2].length; i++) { list.push(options[selected][2][i]); }
     calcPossible();
-    if (options[selected][1] > 0) { roll(options[selected][1], channel); } else { viewCurrent(channel); }
+    if (options[selected][1] > 0) { roll(options[selected][1], channel, true); } else { lastRolls = 0; viewCurrent(channel); }
 }
 
-function selectByName(name, channel) {
-    for (let i = 0; i < options.length; i++) {
-        if (options[i][0] === name) {
-            selectId(i, channel);
-            return true;
-        }
-    }
-    return false;
-}
+function selectByName(name, channel) { const i = find(name); if (i > -1) { selectId(i, channel); return true; } return false; }
 
 function sendMessage(channel, title, message) { if (channel != null) {sendEmbed(channel, title, message, color, []); } else { console.log(title + ": " + message); } }
 
