@@ -41,6 +41,7 @@ let possible = [];
 let removed = [];
 let selected = 0;
 let lastRolls = 0;
+const NO_SPECIAL = -1;
 const RANDOM_CHANCE = 10;
 const accidentMessages = ["Oops, i might have scrambled some lists... ;P", "Did you check your current item list? ;P", "I think i shuffled some of the values, not sure how that happened -_-", "Are you proud of me mom? xD"];
 const BASE_OPTIONS_LENGTH = options.length;
@@ -143,7 +144,7 @@ function roll(count, channel, start) {
             let r = random(0, list.length - 1);
             removed.push(list[r]);
             let tmp = [];
-            for (let i = 0; i < list.length; i++) { if (i != r) { tmp.push(list[i]); } }
+            for (let i = 0; i < list.length; i++) { if (i !== r) { tmp.push(list[i]); } }
             list = [];
             for (let i = 0; i < tmp.length; i++) { if (!contains(list, tmp[i])) { list.push(tmp[i]); } }
         }
@@ -179,28 +180,22 @@ function calcPossible() {
 
 function viewCurrent(channel) {
     const minSpecial = list.length - 1 - lastRolls;
-    let lists = ["", "", ""];
-    for (let i = 0; i < list.length; i++) { lists[i % VIEW_COLUMNS] += (i > minSpecial ? "> ***" : "") + list[i] + (i > minSpecial ? "***" : "") + "\n"; }
+    const lists = columnize(list, VIEW_COLUMNS, minSpecial);
     let fields = [];
-    for (let i = 0; i < Math.min(list.length, VIEW_COLUMNS); i++) { fields.push([(i == 0 ? "Items" : "."), lists[i], true]); }
+    for (let i = 0; i < Math.min(list.length, VIEW_COLUMNS); i++) { fields.push([(i === 0 ? "Items" : "."), lists[i], true]); }
     if (list.length < 1) { fields.push(["Items", "No items", false]); }
     fields.push(["Possible", possible.length + " items", false]);
-    let removes = ["", "", ""];
     if (removed.length > 0) {
-        for (let i = 0; i < removed.length; i++) { removes[i % VIEW_COLUMNS] += removed[i] + "\n"; }
-        for (let i = 0; i < Math.min(removed.length, VIEW_COLUMNS); i++) { fields.push([(i == 0 ? "Removed" : "."), removes[i], true]); }
+        const removes = columnize(removed, VIEW_COLUMNS, NO_SPECIAL);
+        for (let i = 0; i < Math.min(removed.length, VIEW_COLUMNS); i++) { fields.push([(i === 0 ? "Removed" : "."), removes[i], true]); }
     }
     if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][0], color, fields); }
 }
 
 function viewPossible(channel) {
-    let tmpPossible = ["", "", ""];
-    for (let i = 0; i < possible.length; i++) {
-        tmpPossible[i % VIEW_COLUMNS] += possible[i];
-        if (i < possible.length - 1) { tmpPossible[i % VIEW_COLUMNS] += "\n"; }
-    }
+    const tmpPossible = columnize(possible, VIEW_COLUMNS, NO_SPECIAL);
     let fields = [];
-    for (let i = 0; i < Math.min(possible.length, VIEW_COLUMNS); i++) { fields.push([(i == 0 ? "Possible" : "."), tmpPossible[i], true]); }
+    for (let i = 0; i < Math.min(possible.length, VIEW_COLUMNS); i++) { fields.push([(i === 0 ? "Possible" : "."), tmpPossible[i], true]); }
     if (possible.length < 1) { fields.push(["Possible", "No possible items", false]); }
     if (channel != null) { sendEmbed(channel, "Items to roll for", "Preset: " + options[selected][0], color, fields); }
 }
@@ -215,16 +210,14 @@ function viewName(name, channel) { const i = find(name); if (i > -1) { viewId(i,
 
 function viewId(i, channel) {
     if (i < 0 || i >= options.length) { if (i < 0 || i >= options.length) { sendMessage(channel, "ERROR", "Option id out of range, nothing has been selected!"); return; } }
-    let items = ["", "", ""];
-    for (let j = 0; j < options[i][2].length; j++) { items[j % VIEW_COLUMNS] += options[i][2][j] + "\n"; }
+    const items = columnize(options[i][2], VIEW_COLUMNS, NO_SPECIAL);
     let fields = [["Info", options[i][1] > 1 ? "This setup has " + options[i][1] + " more items on top of the starter items, rolled from the list of possibilities" : (options[i][1] === 1 ? "This setup has 1 more item on top of the starter items, rolled from the list of possibilities" : "This setup has no random items added"), false]];
-    if (options[i][2].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][2].length); j++) { fields.push([(j == 0 ? "Starter items:" : "."), items[j], true]); } }
+    if (options[i][2].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][2].length); j++) { fields.push([(j === 0 ? "Starter items:" : "."), items[j], true]); } }
     if (options[i][2].length < 1) { fields.push(["Starter items:", "No standard starter items", false]); }
-    let posItems = ["", "", ""];
-    for (let j = 0; j < options[i][3].length; j++) { posItems[j % VIEW_COLUMNS] += options[i][3][j] + "\n"; }
-    if (options[i][3].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][3].length); j++) { fields.push([(j == 0 ? "Possible roll-able items:" : "."), posItems[j], true]); } }
+    const posItems = columnize(options[i][3], VIEW_COLUMNS, NO_SPECIAL);
+    if (options[i][3].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][3].length); j++) { fields.push([(j === 0 ? "Possible roll-able items:" : "."), posItems[j], true]); } }
     if (options[i][3].length < 1) { fields.push(["Possible roll-able items:", "No possible items", false]); }
-    if (channel != null) { sendEmbed(channel, name, (i === selected ? "Selected" : "Showing") +" option: " + options[i][0], color, fields); }
+    if (channel != null) { sendEmbed(channel, options[i][0], (i === selected ? "Selected" : "Showing") +" option: " + options[i][0], color, fields); }
 }
 
 function selectId(i, channel) {
@@ -276,7 +269,7 @@ function randomAction(channel) {
         options.push([name, d, it, pos]);
 
         // LET THE RANDOM COMMENCE
-        if (!selectByName(name, channel)) { sendMessage(channel, "Randomizer error", "Something went wrong trying to make a random funny thing, this shouldnt happen again once it gets fixed!"); return; }
+        if (!selectByName(name, channel)) { sendMessage(channel, "Randomizer error", "Something went wrong trying to make a random funny thing, this shouldn't happen again once it gets fixed!"); return; }
         randomMessage(channel, accidentMessages);
         return;
     }
@@ -287,4 +280,12 @@ function randomMessage(channel, list) {
     let c = "#";
     for (let i = 0; i < 6; i++) { c += hex[random(0, hex.length -1)]; }
     sendEmbed(channel, "Random?", list[random(0, list.length - 1)], c, []);
+}
+
+function columnize(array, columns, minSpecial) {
+    let tmp = [];
+    minSpecial = (minSpecial < 0 ? array.length : minSpecial);
+    for (let i = 0; i < columns; i++) { tmp.push(""); } // Set up list as string type
+    for (let i = 0; i < array.length; i++) { tmp[i % columns] += (i > minSpecial ? "> ***" : "") + array[i] + (i > minSpecial ? "***" : "") +"\n" }
+    return tmp;
 }
