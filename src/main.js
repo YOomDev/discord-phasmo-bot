@@ -26,13 +26,26 @@ const TRIPOD = "Tripod";
 const ALL = [ EMF, FLASHLIGHT, STRONG_FLASHLIGHT, SPIRIT_BOX, WRITING, UV_GLOWSTICK, UV_FLASHLIGHT, VIDEO_CAMERA, PHOTO_CAMERA, DOTS, CANDLE, CRUCIFIX, HEAD_CAMERA, LIGHTER, MOTION_SENSOR, PARABOLIC_MICROPHONE, SALT, SANITY_PILL, SMUDGE_STICK, SOUND_SENSOR, TRIPOD, THERMOMETER ];
 const STARTER = [EMF, FLASHLIGHT, UV_FLASHLIGHT, DOTS, WRITING, SPIRIT_BOX, VIDEO_CAMERA, THERMOMETER];
 
-// format = [name, starting rolls, starting items, possible items, remove instead of add]
+// Specials
+const NO_SPECIAL = -1; // also used for columnize() if no special indices are preferred
+const SPECIAL_RANDOM = 0;
+const SPECIAL_REMOVER = 1;
+const SPECIAL_RANDOM_LIST = [NO_SPECIAL, SPECIAL_REMOVER];
+
+// Options indices
+const NAME = 0;
+const RANDOM = 1;
+const START = 2;
+const POSSIBLE = 3;
+const SPECIAL = 4;
+
+// format: [name, starting rolls, starting items, possible items, specials]
 let options = [
-    ["evidence-rolls", 4, [], ALL, false],
-    ["normal", 0, STARTER, ALL, false],
-    ["test", 8, [], ALL, true],
-    ["empty", 0, [], [], false],
-    ["remover", 0, ALL, [], true],
+    ["evidence-rolls", 4, [], ALL, NO_SPECIAL],
+    ["normal", 0, STARTER, ALL, NO_SPECIAL],
+    ["test", 8, [], ALL, SPECIAL_REMOVER],
+    ["empty", 0, [], [], NO_SPECIAL],
+    ["remover", 0, ALL, [], SPECIAL_REMOVER],
 ];
 
 const VIEW_COLUMNS = 1;
@@ -41,7 +54,6 @@ let possible = [];
 let removed = [];
 let selected = 0;
 let lastRolls = 0;
-const NO_SPECIAL = -1;
 const RANDOM_CHANCE = 10;
 const accidentMessages = ["Oops, i might have scrambled some lists... ;P", "Did you check your current item list? ;P", "I think i shuffled some of the values, not sure how that happened -_-", "Are you proud of me mom? xD"];
 const BASE_OPTIONS_LENGTH = options.length;
@@ -50,7 +62,7 @@ const hex = "0123456789abcdef";
 
 // Command info
 const prefix = "!";
-const color = "#311670";
+const color = "#623270";
 const help = [ [prefix + "help", "Displays all the available commands", false],
                [prefix + "options", "Displays all the randomizer options", false],
                [prefix + "view [option]", "displays the settings for an option", false],
@@ -134,7 +146,7 @@ function random(min, max) { return Math.floor(min + (Math.random() * (max - min 
 function chance(percentage) { return random(0, 99) < percentage; }
 
 function roll(count, channel, start) {
-    if (options[selected][4] * !start) {
+    if (options[selected][SPECIAL] === SPECIAL_REMOVER && !start) {
         // remove
         possible = [];
         removed = [];
@@ -170,7 +182,7 @@ function roll(count, channel, start) {
 function calcPossible() {
     possible = [];
     let remove = [];
-    for (let i = 0; i < options[selected][3].length; i++) { possible.push(options[selected][3][i]); }
+    for (let i = 0; i < options[selected][POSSIBLE].length; i++) { possible.push(options[selected][POSSIBLE][i]); }
     for (let i = 0; i < list.length; i++) { remove.push(list[i]); }
     for (let i = 0; i < remove.length; i++) {
         const t = possible.indexOf(remove[i]);
@@ -179,8 +191,7 @@ function calcPossible() {
 }
 
 function viewCurrent(channel) {
-    const minSpecial = list.length - 1 - lastRolls;
-    const lists = columnize(list, VIEW_COLUMNS, minSpecial);
+    const lists = columnize(list, VIEW_COLUMNS, list.length - 1 - lastRolls);
     let fields = [];
     for (let i = 0; i < Math.min(list.length, VIEW_COLUMNS); i++) { fields.push([(i === 0 ? "Items" : "."), lists[i], true]); }
     if (list.length < 1) { fields.push(["Items", "No items", false]); }
@@ -189,7 +200,7 @@ function viewCurrent(channel) {
         const removes = columnize(removed, VIEW_COLUMNS, NO_SPECIAL);
         for (let i = 0; i < Math.min(removed.length, VIEW_COLUMNS); i++) { fields.push([(i === 0 ? "Removed" : "."), removes[i], true]); }
     }
-    if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][0], color, fields); }
+    if (channel != null) { sendEmbed(channel, "Current items", "Preset: " + options[selected][NAME], color, fields); }
 }
 
 function viewPossible(channel) {
@@ -197,12 +208,12 @@ function viewPossible(channel) {
     let fields = [];
     for (let i = 0; i < Math.min(possible.length, VIEW_COLUMNS); i++) { fields.push([(i === 0 ? "Possible" : "."), tmpPossible[i], true]); }
     if (possible.length < 1) { fields.push(["Possible", "No possible items", false]); }
-    if (channel != null) { sendEmbed(channel, "Items to roll for", "Preset: " + options[selected][0], color, fields); }
+    if (channel != null) { sendEmbed(channel, "Items to roll for", "Preset: " + options[selected][NAME], color, fields); }
 }
 
 function viewOptions(channel) {
     let fields = [];
-    for (let i = 0 ; i < options.length; i++) { fields.push([options[i][0], options[i][1] + " random items, " + options[i][2].length + " set items and "+  options[i][3].length + " items to roll for." + (options[i][4] ? "\nWill remove items on roll after starting" : ""), true]); }
+    for (let i = 0 ; i < options.length; i++) { fields.push([options[i][NAME], options[i][RANDOM] + " random items, " + options[i][START].length + " set items and "+  options[i][POSSIBLE].length + " items to roll for." + (options[i][SPECIAL] === SPECIAL_REMOVER ? "\nWill remove items on roll after starting" : ""), true]); }
     sendEmbed(channel, "Options", "A list of all the available setups", color, fields);
 }
 
@@ -210,14 +221,14 @@ function viewName(name, channel) { const i = find(name); if (i > -1) { viewId(i,
 
 function viewId(i, channel) {
     if (i < 0 || i >= options.length) { if (i < 0 || i >= options.length) { sendMessage(channel, "ERROR", "Option id out of range, nothing has been selected!"); return; } }
-    const items = columnize(options[i][2], VIEW_COLUMNS, NO_SPECIAL);
-    let fields = [["Info", options[i][1] > 1 ? "This setup has " + options[i][1] + " more items on top of the starter items, rolled from the list of possibilities" : (options[i][1] === 1 ? "This setup has 1 more item on top of the starter items, rolled from the list of possibilities" : "This setup has no random items added"), false]];
-    if (options[i][2].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][2].length); j++) { fields.push([(j === 0 ? "Starter items:" : "."), items[j], true]); } }
-    if (options[i][2].length < 1) { fields.push(["Starter items:", "No standard starter items", false]); }
-    const posItems = columnize(options[i][3], VIEW_COLUMNS, NO_SPECIAL);
-    if (options[i][3].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][3].length); j++) { fields.push([(j === 0 ? "Possible roll-able items:" : "."), posItems[j], true]); } }
-    if (options[i][3].length < 1) { fields.push(["Possible roll-able items:", "No possible items", false]); }
-    if (channel != null) { sendEmbed(channel, options[i][0], (i === selected ? "Selected" : "Showing") +" option: " + options[i][0], color, fields); }
+    const items = columnize(options[i][START], VIEW_COLUMNS, NO_SPECIAL);
+    let fields = [["Info", options[i][RANDOM] > 1 ? "This setup has " + options[i][START] + " more items on top of the starter items, rolled from the list of possibilities" : (options[i][START] === 1 ? "This setup has 1 more item on top of the starter items, rolled from the list of possibilities" : "This setup has no random items added"), false]];
+    if (options[i][START].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][START].length); j++) { fields.push([(j === 0 ? "Starter items:" : "."), items[j], true]); } }
+    if (options[i][START].length < 1) { fields.push(["Starter items:", "No standard starter items", false]); }
+    const posItems = columnize(options[i][POSSIBLE], VIEW_COLUMNS, NO_SPECIAL);
+    if (options[i][POSSIBLE].length > 0) { for (let j = 0; j < Math.min(VIEW_COLUMNS, options[i][POSSIBLE].length); j++) { fields.push([(j === 0 ? "Possible roll-able items:" : "."), posItems[j], true]); } }
+    if (options[i][POSSIBLE].length < 1) { fields.push(["Possible roll-able items:", "No possible items", false]); }
+    if (channel != null) { sendEmbed(channel, options[i][NAME], (i === selected ? "Selected" : "Showing") +" option: " + options[i][NAME], color, fields); }
 }
 
 function selectId(i, channel) {
@@ -228,9 +239,9 @@ function selectId(i, channel) {
     selected = i;
     list = [];
     removed = [];
-    for (let i = 0; i < options[selected][2].length; i++) { list.push(options[selected][2][i]); }
+    for (let i = 0; i < options[selected][START].length; i++) { list.push(options[selected][START][i]); }
     calcPossible();
-    if (options[selected][1] > 0) { roll(options[selected][1], channel, true); } else { lastRolls = 0; viewCurrent(channel); }
+    if (options[selected][RANDOM] > 0) { roll(options[selected][RANDOM], channel, true); } else { lastRolls = 0; viewCurrent(channel); }
 }
 
 function selectByName(name, channel) { const i = find(name); if (i > -1) { selectId(i, channel); return true; } return false; }
