@@ -79,7 +79,7 @@ let allowedRoles = ["Admin", "Dev", "Ghost hunter"];
 const needsRoles = true;
 const tempAdd = false;
 const leaveIfUnverified = false;
-const token = "MTA3MDA2NzQ3MDkzNDc0NTEyOA.GwsRq4.-DcB4KJ66BhzpO2iIF2Vv5dfQ76fgjgK1ITVI0";
+const token = "there used to be.a token here.-but it has been reset and cannot be reused";
 const { Client, Events, GatewayIntentBits, EmbedBuilder, ActivityType } = require('discord.js');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
